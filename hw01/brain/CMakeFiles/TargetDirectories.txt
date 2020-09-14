@@ -1,0 +1,3 @@
+/home/tkaunzinger/homework/hw1/cs5335hw-gazebo/brain/CMakeFiles/rebuild_cache.dir
+/home/tkaunzinger/homework/hw1/cs5335hw-gazebo/brain/CMakeFiles/edit_cache.dir
+/home/tkaunzinger/homework/hw1/cs5335hw-gazebo/brain/CMakeFiles/brain.dir
