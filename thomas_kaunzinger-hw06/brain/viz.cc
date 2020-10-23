@@ -183,7 +183,7 @@ int viz_hit(unordered_map<coord, cell_params>& occupancy_grid,
     draw_square(center_x + robot_pos.x * k_cell_size,
                 center_y - robot_pos.y * k_cell_size, k_cell_size);
 
-    gfx_flush();
+    //gfx_flush();
   
     return 0;
 }

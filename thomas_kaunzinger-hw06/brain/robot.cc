@@ -49,8 +49,11 @@ nudge(int* ee)
 float
 degrade(float xx, int ee)
 {
+    /*
     float aa = 1.0f + 0.05 * float(ee);
     return aa * xx;
+    */
+    return 1.05*xx + 0.2*ee;
 }
 
 Robot::Robot(int argc, char* argv[], void (*cb)(Robot*))
@@ -114,8 +117,8 @@ Robot::update()
     nudge(&(this->err_l));
     nudge(&(this->err_r));
 
-    this->pos_x = clamp(raw_x - 1.0, degrade(raw_x, err_x) + 0.2*err_x, raw_x + 1.0);
-    this->pos_y = clamp(raw_y - 1.0, degrade(raw_y, err_y) + 0.2*err_y, raw_y + 1.0);
+    this->pos_x = degrade(raw_x, err_x);
+    this->pos_y = degrade(raw_y, err_y);
     this->pos_t = raw_t; // no error on heading position, not worth it anymore
 
     this->on_update(this);

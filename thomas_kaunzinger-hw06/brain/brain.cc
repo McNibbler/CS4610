@@ -22,12 +22,14 @@
 using namespace std;
 
 // Constants
-#define k_wall          1.6
+#define k_wall          1.5
 #define k_far           2.0
 #define k_vel           1.5
 #define k_vel_fast      3.0
 #define k_mma_window    10      // Window size of the modified moving average position
-#define k_minimum_mma   3
+#define k_minimum_mma   5
+#define k_discard       3       // How many of the first MMA values to discard
+                                // (because robo starts at 0,0 for some reason)
 
 // States
 #define FIRST_WALL  0x00
@@ -42,7 +44,7 @@ float m_last_x = 0.0;
 float m_last_y = 0.0;
 deque<float> m_running_xs;
 deque<float> m_running_ys;
-
+bool m_purge_start = true;
 
 // Function initializations
 void find_wall(Robot* robot);
@@ -128,7 +130,21 @@ void callback(Robot* robot) {
     y_send = running / m_running_ys.size();
 
 
-    // Updates the occupancy grid
+    // Purges some of the initial values because they are really badly initialized.
+    // For some reason the program always starts at (0, 0), which destroys the
+    // initial average.
+    if (m_purge_start && m_running_xs.size() >= k_discard) {
+        while (m_running_xs.size() > 0) {
+            m_running_xs.pop_back();
+        }
+        while (m_running_ys.size() > 0) {
+            m_running_ys.pop_back();
+        }
+        m_purge_start = false;
+    }
+
+
+    // Updates the occupancy grid once there's enough data
     if (m_running_xs.size() > k_minimum_mma) {
         for (auto hit : robot->ranges) {
             bool is_hit = false;
@@ -171,7 +187,7 @@ int main(int argc, char* argv[]) {
     cout << "making robot" << endl;
     Robot robot(argc, argv, callback);
     //robot->do_stuff();
-    //thread rthr(robot_thread, &robot);
+    thread rthr(robot_thread, &robot);
 
     viz_run();
 
