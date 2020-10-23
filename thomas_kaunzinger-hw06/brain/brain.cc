@@ -56,13 +56,13 @@ void follow(Robot* robot);
 void callback(Robot* robot) {
 
     // float lft = clamp(0.0, robot->ranges[2].range, 2.0);
-    float fwd = (clamp(0.0, robot->ranges[2].range, 2.1) + 
-                 clamp(0.0, robot->ranges[3].range, 2.1) + 
-                 clamp(0.0, robot->ranges[4].range, 2.1)) / 3.0;
-    float frgt = (clamp(0.0, robot->ranges[1].range, 2.1) + 
-                  clamp(0.0, robot->ranges[2].range, 2.1)) / 2.0;
-    float flft = (clamp(0.0, robot->ranges[4].range, 2.1) + 
-                  clamp(0.0, robot->ranges[5].range, 2.1)) / 2.0;
+    float fwd = (clamp(0.0, robot->ranges[2].range, 2.05) + 
+                 clamp(0.0, robot->ranges[3].range, 2.05) + 
+                 clamp(0.0, robot->ranges[4].range, 2.05)) / 3.0;
+    float frgt = (clamp(0.0, robot->ranges[1].range, 2.05) + 
+                  clamp(0.0, robot->ranges[2].range, 2.05)) / 2.0;
+    float flft = (clamp(0.0, robot->ranges[4].range, 2.05) + 
+                  clamp(0.0, robot->ranges[5].range, 2.05)) / 2.0;
 
     if (m_state == FIRST_WALL && fwd > k_wall)                m_state = FIRST_WALL;
     else if (fwd > k_wall && flft > k_wall && frgt > k_wall)  m_state = FIND_WALL;
