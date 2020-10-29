@@ -58,7 +58,8 @@ static int viz_init = 0;
 int viz_hit(unordered_map<coord, cell_params>& occupancy_grid,
             float robot_x, float robot_y, float robot_t,
             float prev_x, float prev_y,
-            float range, float angle, bool is_hit) {
+            float range, float angle, bool is_hit,
+            vector<coord> path, coord end_coord) {
     guard _gg(mx);
     if (!viz_init) {
       puts("viz skip");
@@ -105,8 +106,9 @@ int viz_hit(unordered_map<coord, cell_params>& occupancy_grid,
             hit_cell.num_misses = 1;
         }
         hit_cell.last_updated = 0;    // NOTE: Update this for time decay
+        mx.lock();
         occupancy_grid[hit_pos] = hit_cell;
-
+        mx.unlock();
     }
     // Update existing entry
     else {
@@ -117,7 +119,9 @@ int viz_hit(unordered_map<coord, cell_params>& occupancy_grid,
         else {
             hit_cell.num_misses++;
         }
+        mx.lock();
         occupancy_grid[hit_pos] = hit_cell;        
+        mx.unlock();
     }
 
     int width = k_window_width;
@@ -138,13 +142,17 @@ int viz_hit(unordered_map<coord, cell_params>& occupancy_grid,
             update_cell.num_hits = 0;
             update_cell.num_misses = 1;
             update_cell.last_updated = 0;    // NOTE: Update this for time decay
+            mx.lock();
             occupancy_grid[c] = update_cell;
+            mx.unlock();
         }
         // Update existing entry
         else {
             update_cell = vacant_it->second;
             update_cell.num_misses++;
+            mx.lock();
             occupancy_grid[c] = update_cell;        
+            mx.unlock();
         }
 
         int light = 255 - static_cast<int>((255 * update_cell.num_hits * k_hit_priority)
@@ -178,10 +186,25 @@ int viz_hit(unordered_map<coord, cell_params>& occupancy_grid,
     }
     draw_square(center_x + prev.x * k_cell_size, center_y - prev.y * k_cell_size, k_cell_size);
 
-    
+    // Draws the path
+    if (path.size() > 0) {
+        gfx_color(128, 100, 192);
+        for (coord& c: path) {
+            draw_square(center_x + c.x * k_cell_size,
+                        center_y - c.y * k_cell_size, k_cell_size);
+        }
+    }
+
+    // Draws the goal
+    gfx_color(128, 192, 128);
+    draw_square(center_x + end_coord.x * k_cell_size,
+                center_y - end_coord.y * k_cell_size, k_cell_size);
+
+    // Draws the new robot position
     gfx_color(0, 128, 192);
     draw_square(center_x + robot_pos.x * k_cell_size,
                 center_y - robot_pos.y * k_cell_size, k_cell_size);
+
 
     //gfx_flush();
   
@@ -265,7 +288,7 @@ coord pos_to_coord(float x, float y) {
     struct coord c;
     c.x = static_cast<int>(round(x / k_granularity));
     c.y = static_cast<int>(round(y / k_granularity));
-    return coord;
+    return c;
 }
 
 // Convers a coord on the occupancy map to an approximate position

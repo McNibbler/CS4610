@@ -24,6 +24,16 @@ typedef struct coord {
     }
 } coord;
 
+
+// Node type to aid in A*
+typedef struct node {
+    struct coord c;
+    float move_cost;
+    float heur_cost;
+    node* parent_node;
+} node;
+
+
 // Hashing function for coord
 // Courtesy of Rubens on Stackoverflow
 namespace std {
@@ -45,7 +55,8 @@ void viz_run();
 int viz_hit(std::unordered_map<coord, cell_params>& occupancy_grid,
             float robot_x, float robot_y, float robot_t,
             float prev_x, float prev_y,
-            float range, float angle, bool is_hit);
+            float range, float angle, bool is_hit,
+            std::vector<coord> path, coord end_coord);
 
 coord pos_to_coord(float x, float y);
 std::pair<float, float> coord_to_pos(coord c);
