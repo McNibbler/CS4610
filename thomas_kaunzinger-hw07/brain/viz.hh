@@ -83,9 +83,10 @@ int viz_hit(std::unordered_map<coord, cell_params>& occupancy_grid,
             float robot_x, float robot_y, float robot_t,
             float prev_x, float prev_y,
             float range, float angle, bool is_hit,
-            std::vector<coord> path, coord end_coord);
+            std::vector<coord> path, coord end_coord, std::vector<coord> last_path);
 
 coord pos_to_coord(float x, float y);
 std::pair<float, float> coord_to_pos(coord c);
+float diff(float deg1, float deg2);
 
 #endif

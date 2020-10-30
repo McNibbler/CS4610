@@ -46,7 +46,6 @@ std::mutex mx;
 using namespace std;
 
 // Function instantiation
-float diff(float deg1, float deg2);
 vector<coord> bresenham(coord pos1, coord pos2);
 void draw_square(int x, int y, int width);
 
@@ -60,7 +59,7 @@ int viz_hit(unordered_map<coord, cell_params>& occupancy_grid,
             float robot_x, float robot_y, float robot_t,
             float prev_x, float prev_y,
             float range, float angle, bool is_hit,
-            vector<coord> path, coord end_coord) {
+            vector<coord> path, coord end_coord, vector<coord> last_path) {
     //guard _gg(mx);
     //if (!viz_init) {
     //  puts("viz skip");
@@ -186,6 +185,24 @@ int viz_hit(unordered_map<coord, cell_params>& occupancy_grid,
         gfx_color(prev_color, prev_color, prev_color);
     }
     draw_square(center_x + prev.x * k_cell_size, center_y - prev.y * k_cell_size, k_cell_size);
+
+    // Undraws the last path
+    if (last_path.size() > 0) {
+        for (coord& c: last_path) {
+            auto prev_check = occupancy_grid.find(c);
+            if (prev_check == occupancy_grid.end()) {
+                gfx_color(k_bg_r, k_bg_g, k_bg_b);
+            }
+            else {
+                struct cell_params c = prev_check->second;
+                int prev_color = 255 - static_cast<int>((255 * c.num_hits * k_hit_priority)
+                                        / (c.num_hits * k_hit_priority + c.num_misses));
+                gfx_color(prev_color, prev_color, prev_color);
+            }
+            draw_square(center_x + c.x * k_cell_size,
+                        center_y - c.y * k_cell_size, k_cell_size);
+        }
+    }
 
     // Draws the path
     if (path.size() > 0) {

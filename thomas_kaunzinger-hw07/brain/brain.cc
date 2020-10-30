@@ -67,6 +67,7 @@ deque<float> m_running_xs;
 deque<float> m_running_ys;
 bool m_purge_start = true;
 vector<coord> m_path;
+vector<coord> m_last_path;
 
 // Function initializations
 void find_wall(Robot* robot);
@@ -80,6 +81,8 @@ void astar_thread();
 bool astar(float current_x, float current_y, float destination_x, float destination_y); 
 float get_current_mma_x(); 
 float get_current_mma_y(); 
+float coord_dist(coord a, coord b);
+int facing(float robot_degrees, float target_degrees, float tolerance);
 
 
 /////////////////////////
@@ -103,42 +106,51 @@ void callback(Robot* robot) {
     float flft = (clamp(0.0, robot->ranges.at(4).range, 2.05) + 
                   clamp(0.0, robot->ranges.at(5).range, 2.05)) / 2.0;
 
-    if (m_state == FIRST_WALL && fwd > k_wall)                m_state = FIRST_WALL;
-    else if (fwd > k_wall && flft > k_wall && frgt > k_wall)  m_state = FIND_WALL;
-    else if (fwd < k_wall && frgt > k_wall && flft > k_wall)  m_state = TURN_RIGHT;
-    else if (fwd > k_wall && frgt > k_wall && flft < k_wall)  m_state = FOLLOW;
-    else if (fwd > k_wall && frgt < k_wall && flft > k_wall)  m_state = FIND_WALL;
-    else if (fwd < k_wall && frgt > k_wall && flft < k_wall)  m_state = TURN_RIGHT;
-    else if (fwd < k_wall && frgt < k_wall && flft > k_wall)  m_state = TURN_RIGHT;
-    else if (fwd < k_wall && frgt < k_wall && flft < k_wall)  m_state = TURN_RIGHT;
-    else if (fwd > k_wall && frgt < k_wall && flft < k_wall)  m_state = FIND_WALL;
-    else                                                      m_state = FIND_WALL;
+
+    // Speed is proportional to the distance from the wall (to avoid obstacles)
+    int speed = k_vel * (fwd - k_wall);
+
+
+
+
+
+
+    //if (m_state == FIRST_WALL && fwd > k_wall)                m_state = FIRST_WALL;
+    //else if (fwd > k_wall && flft > k_wall && frgt > k_wall)  m_state = FIND_WALL;
+    //else if (fwd < k_wall && frgt > k_wall && flft > k_wall)  m_state = TURN_RIGHT;
+    //else if (fwd > k_wall && frgt > k_wall && flft < k_wall)  m_state = FOLLOW;
+    //else if (fwd > k_wall && frgt < k_wall && flft > k_wall)  m_state = FIND_WALL;
+    //else if (fwd < k_wall && frgt > k_wall && flft < k_wall)  m_state = TURN_RIGHT;
+    //else if (fwd < k_wall && frgt < k_wall && flft > k_wall)  m_state = TURN_RIGHT;
+    //else if (fwd < k_wall && frgt < k_wall && flft < k_wall)  m_state = TURN_RIGHT;
+    //else if (fwd > k_wall && frgt < k_wall && flft < k_wall)  m_state = FIND_WALL;
+    //else                                                      m_state = FIND_WALL;
 
     
-    // Determines what state to engage in
-    switch(m_state) {
-        case FIRST_WALL:
-            robot->set_vel(k_vel, k_vel);
-            break;
-        case FIND_WALL:
-            //cout << "FIND WALL - FLFT<" << flft << ">, FWD<"
-            //    << fwd << ">, FRGT<" << frgt << ">" << endl;
-            find_wall(robot);
-            break;
-        case TURN_RIGHT:
-            //cout << "TURN RIGHT - FLFT<" << flft << ">, FWD<"
-            //    << fwd << ">, FRGT<" << frgt << ">" << endl;
-            turn_right(robot);
-            break;
-        case FOLLOW:
-            //cout << "FOLLOW - FLFT<" << flft << ">, FWD<"
-            //    << fwd << ">, FRGT<" << frgt << ">" << endl;
-            follow(robot);
-            break;
-        default:
-            //cout << "DEFAULT" << endl;
-            robot->set_vel(k_vel, k_vel);
-    }
+    //// Determines what state to engage in
+    //switch(m_state) {
+    //    case FIRST_WALL:
+    //        robot->set_vel(k_vel, k_vel);
+    //        break;
+    //    case FIND_WALL:
+    //        //cout << "FIND WALL - FLFT<" << flft << ">, FWD<"
+    //        //    << fwd << ">, FRGT<" << frgt << ">" << endl;
+    //        find_wall(robot);
+    //        break;
+    //    case TURN_RIGHT:
+    //        //cout << "TURN RIGHT - FLFT<" << flft << ">, FWD<"
+    //        //    << fwd << ">, FRGT<" << frgt << ">" << endl;
+    //        turn_right(robot);
+    //        break;
+    //    case FOLLOW:
+    //        //cout << "FOLLOW - FLFT<" << flft << ">, FWD<"
+    //        //    << fwd << ">, FRGT<" << frgt << ">" << endl;
+    //        follow(robot);
+    //        break;
+    //    default:
+    //        //cout << "DEFAULT" << endl;
+    //        robot->set_vel(k_vel, k_vel);
+    //}
 
     //cout << "x<" << robot->pos_x << ">, y<" << robot->pos_y
     //    << ">, t<" << r2d(robot->pos_t) << ">" << endl;
@@ -169,14 +181,63 @@ void callback(Robot* robot) {
         m_purge_start = false;
     }
 
-    // Also copies the path to send to viz_hit to draw the path
+    // Copies the running path for the robo logic and the viz drawing
     vector<coord> path_to_send = m_path;
-    mx.unlock();
-
 
     // Gets the MMA
     float x_send = get_current_mma_x();
     float y_send = get_current_mma_y();
+
+    mx.unlock();
+
+
+    // Finds the coord that is the closest to the robot and then targets the next one
+    float target_angle = 0;
+    if (path_to_send.size() > 0) {
+
+        // Searches for the closest node to the robot
+        struct coord closest = path_to_send[0];
+        struct coord robo_coord = pos_to_coord(x_send, y_send);
+        float shortest_dist = coord_dist(closest, robo_coord);
+        int index_best = 0;
+        for (int i = 0; i < path_to_send.size(); i++) {
+            struct coord c = path_to_send[i];
+            float dist = coord_dist(c, robo_coord);
+            if (dist < shortest_dist) {
+                index_best = i;
+                closest = c;
+                shortest_dist = dist;
+            }
+        }
+
+        // Picks the node next on the path after the closest node to the robot
+        //int target_index = (index_best < path_to_send.size() - 1) ? target_index + 1 : target_index;
+        //struct coord target_coord = path_to_send[target_index];
+        struct coord target_coord = closest;
+
+        // Finds the target angle between the robot and the coord
+        target_angle = r2d(atan(static_cast<float>(target_coord.y - robo_coord.y)
+                                / static_cast<float>(target_coord.x - robo_coord.x)));
+
+        // Gazeboifies the angles
+        while (target_angle > 180)      target_angle -= 360;
+        while (target_angle < -180)     target_angle += 360;
+    }
+
+
+    // Turns in place until 15 degrees from target
+    int face = facing(r2d(robot->pos_t), target_angle, 15);
+    if (face == 0) {
+        int check = facing(r2d(robot->pos_t), target_angle, 0.00001);
+        // Moves in direction of the next angle
+        (check > 0) ? robot->set_vel(speed * 1.2, speed * 0.8)
+                    : robot->set_vel(speed * 0.8, speed * 1.2);
+    }
+    // Turn in place
+    else {
+        (face > 0) ? robot->set_vel(speed, -speed) : robot->set_vel(-speed, speed);
+    }
+    
 
     // Updates the occupancy grid once there's enough data
     if (m_running_xs.size() > k_minimum_mma) {
@@ -189,18 +250,32 @@ void callback(Robot* robot) {
                     x_send, y_send, robot->pos_t,
                     m_last_x, m_last_y,
                     clamp(0, hit.range, 2.0), -hit.angle, is_hit,
-                    path_to_send, pos_to_coord(k_goal_x, k_goal_y));
+                    path_to_send, pos_to_coord(k_goal_x, k_goal_y), m_last_path);
                // cout<<"["<<i<<"]: "<< hit.range<<"@"<<r2d(hit.angle)<<endl;
         }
     }
     m_last_x = x_send;
-    m_last_y = y_send;
+    m_last_y= y_send;
+
+    m_last_path = path_to_send;
 }
 
 
 // Inches forward to a wall
 void find_wall(Robot* robot) {
     robot->set_vel(-k_vel, k_vel_fast); 
+}
+
+// 1 == too far left, 0 ==  facing, -1 == too far right
+int facing(float robot_degrees, float target_degrees, float tolerance) {
+    float diff = robot_degrees - target_degrees;
+    diff = diff > 180 ? diff - 360 : diff;
+    diff = diff < -180 ? diff + 360 : diff;
+    if (abs(diff) < tolerance) {
+        return 0;
+    }
+    int ret = (diff < 0) ? -1 : 1;
+    return ret;
 }
 
 // Turns the robot left
@@ -248,6 +323,10 @@ float get_current_mma_y() {
     return running / m_running_ys.size();
 }
 
+// Returns the distance between two coords
+float coord_dist(coord a, coord b) {
+    return sqrt(pow(a.x - b.x, 2) + pow(a.y - b.y, 2));
+}
 
 /////////////////////////
 // ASTAR FUNCTIONALITY //
@@ -263,22 +342,19 @@ void astar_thread() {
     // Actually run A*
     while (!finished) {
         cout << "Running new instance of A*..." << endl;
-        finished = astar(get_current_mma_x(), get_current_mma_y(), k_goal_x, k_goal_y);
+        mx.lock();
+        float x = get_current_mma_x();
+        float y = get_current_mma_y();
+        mx.unlock();
+        finished = astar(x, y, k_goal_x, k_goal_y);
         sleep(1);
     }
 }
 
 // Calculates astar using the current information
 bool astar(float current_x, float current_y, float destination_x, float destination_y) {
-    // Terminates when you are at the destination within a tolerance
-    //if (current_x < destination_x + k_end_tolerance
-    //        && current_x > destination_x - k_end_tolerance){
-    //    if (current_y < destination_y + k_end_tolerance
-    //            && current_y > destination_y - k_end_tolerance){
-    //        return true;
-    //    }
-    //}
 
+    // Gets bounds
     int max_x = static_cast<int>(ceil((k_width_meters / 2) / k_granularity));
     int max_y = static_cast<int>(ceil((k_height_meters / 2) / k_granularity));
 
@@ -398,7 +474,6 @@ bool astar(float current_x, float current_y, float destination_x, float destinat
     while (!(running_coord == start_coord)) {
         to_copy.push_back(running_coord);
         running_coord = seen[running_coord];
-        i++;
     }
 
     // Copies the A* result to the shared memory
