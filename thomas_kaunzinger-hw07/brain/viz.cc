@@ -23,6 +23,8 @@ extern "C" {
 #include "gfx.h"
 }
 
+std::mutex mx;
+
 // Math macros
 #define d2r(degrees) ((degrees) * M_PI / 180.0)
 #define r2d(radians) ((radians) * 180.0 / M_PI)
@@ -50,7 +52,6 @@ void draw_square(int x, int y, int width);
 
 // Init stuff
 typedef lock_guard<mutex> guard;
-mutex mx;
 static int viz_init = 0;
 
 
@@ -60,11 +61,11 @@ int viz_hit(unordered_map<coord, cell_params>& occupancy_grid,
             float prev_x, float prev_y,
             float range, float angle, bool is_hit,
             vector<coord> path, coord end_coord) {
-    guard _gg(mx);
-    if (!viz_init) {
-      puts("viz skip");
-      return 0;
-    }
+    //guard _gg(mx);
+    //if (!viz_init) {
+    //  puts("viz skip");
+    //  return 0;
+    //}
   
   
     struct coord robot_pos;

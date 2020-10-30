@@ -54,6 +54,9 @@ void follow(Robot* robot);
 // Robot callback
 // Credit to The Construct on YouTube for the simple wallfollow implementation
 void callback(Robot* robot) {
+    if (robot->ranges.size() == 0) {
+        return;
+    }
 
     // float lft = clamp(0.0, robot->ranges[2].range, 2.0);
     float fwd = (clamp(0.0, robot->ranges[2].range, 2.05) + 

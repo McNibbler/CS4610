@@ -11,8 +11,10 @@
 #include <mutex>
 #include <math.h>
 #include <deque>
+#include <set>
 #include <vector>
 //#include <X11/Xlib.h>
+//#undef Status
 #include "robot.hh"
 #include "viz.hh"
 
@@ -21,6 +23,9 @@
 #define r2d(radians) ((radians) * 180.0 / M_PI)
 #define clamp(min, x, max) (((x) < (min)) ? (min) : (((x) > (max)) ? (max) : (x)))
 
+
+extern std::mutex mx;
+
 // Clogged up namespace smh
 using namespace std;
 
@@ -28,6 +33,13 @@ using namespace std;
 #define k_goal_x                20.0    // Destination location
 #define k_goal_y                0.0
 #define k_end_tolerance         0.5
+// Copied from viz.cc cus im lazy
+#define k_width_meters          70.0
+#define k_height_meters         70.0
+#define k_window_height         1000
+#define k_cell_size             3
+#define k_granularity           (1.0 * (k_cell_size) / ((k_window_height) / ((k_height_meters)))) 
+#define k_hit_priority          3       
 
 #define k_wall                  1.5
 #define k_far                   2.0
@@ -38,7 +50,6 @@ using namespace std;
 #define k_discard               3       // How many of the first MMA values to discard
                                         // (because robo starts at 0,0 for some reason)
 #define k_wall_confidence       0.75    // Scalar coefficient on confidence that a cell is a wall
-#define k_hit_priority          3       // Copied from viz.cc cus im lazy
 
 
 // States
@@ -57,14 +68,12 @@ deque<float> m_running_ys;
 bool m_purge_start = true;
 vector<coord> m_path;
 
-mutex mut;
-
 // Function initializations
 void find_wall(Robot* robot);
 void turn_right(Robot* robot);
 void follow(Robot* robot);
 bool is_wall(cell_params cp);
-node* make_node(coord c);
+node make_node(coord c);
 coord make_coord(int x, int y);
 vector<coord> neighbors(coord c);
 void astar_thread();
@@ -81,14 +90,18 @@ float get_current_mma_y();
 // Credit to The Construct on YouTube for the simple wallfollow implementation
 void callback(Robot* robot) {
 
+    if (robot->ranges.size() == 0) {
+        return;
+    }
+
     // float lft = clamp(0.0, robot->ranges[2].range, 2.0);
-    float fwd = (clamp(0.0, robot->ranges[2].range, 2.05) + 
-                 clamp(0.0, robot->ranges[3].range, 2.05) + 
-                 clamp(0.0, robot->ranges[4].range, 2.05)) / 3.0;
-    float frgt = (clamp(0.0, robot->ranges[1].range, 2.05) + 
-                  clamp(0.0, robot->ranges[2].range, 2.05)) / 2.0;
-    float flft = (clamp(0.0, robot->ranges[4].range, 2.05) + 
-                  clamp(0.0, robot->ranges[5].range, 2.05)) / 2.0;
+    float fwd = (clamp(0.0, robot->ranges.at(2).range, 2.05) + 
+                 clamp(0.0, robot->ranges.at(2).range, 2.05) + 
+                 clamp(0.0, robot->ranges.at(4).range, 2.05)) / 3.0;
+    float frgt = (clamp(0.0, robot->ranges.at(0).range, 2.05) + 
+                  clamp(0.0, robot->ranges.at(2).range, 2.05)) / 2.0;
+    float flft = (clamp(0.0, robot->ranges.at(4).range, 2.05) + 
+                  clamp(0.0, robot->ranges.at(5).range, 2.05)) / 2.0;
 
     if (m_state == FIRST_WALL && fwd > k_wall)                m_state = FIRST_WALL;
     else if (fwd > k_wall && flft > k_wall && frgt > k_wall)  m_state = FIND_WALL;
@@ -127,12 +140,12 @@ void callback(Robot* robot) {
             robot->set_vel(k_vel, k_vel);
     }
 
-    cout << "x<" << robot->pos_x << ">, y<" << robot->pos_y
-        << ">, t<" << r2d(robot->pos_t) << ">" << endl;
+    //cout << "x<" << robot->pos_x << ">, y<" << robot->pos_y
+    //    << ">, t<" << r2d(robot->pos_t) << ">" << endl;
 
 
     // Updates the running x and y positions for the MMA algorithm
-    mut.lock();
+    mx.lock();
 
     m_running_xs.push_front(robot->pos_x);
     m_running_ys.push_front(robot->pos_y);
@@ -158,7 +171,7 @@ void callback(Robot* robot) {
 
     // Also copies the path to send to viz_hit to draw the path
     vector<coord> path_to_send = m_path;
-    mut.unlock();
+    mx.unlock();
 
 
     // Gets the MMA
@@ -243,134 +256,155 @@ float get_current_mma_y() {
 // Perpetually astars and updates the path of the robot
 void astar_thread() {
     bool finished = false;
-    while (finished) {
+    // This is really epic and good
+    while (get_current_mma_x() == 0 || get_current_mma_y() == 0) {
+        sleep(1);
+    }
+    // Actually run A*
+    while (!finished) {
+        cout << "Running new instance of A*..." << endl;
         finished = astar(get_current_mma_x(), get_current_mma_y(), k_goal_x, k_goal_y);
+        sleep(1);
     }
 }
 
 // Calculates astar using the current information
 bool astar(float current_x, float current_y, float destination_x, float destination_y) {
     // Terminates when you are at the destination within a tolerance
-    if (current_x < destination_x + k_end_tolerance
-            && current_x > destination_x - k_end_tolerance){
-        if (current_y < destination_y + k_end_tolerance
-                && current_y > destination_y - k_end_tolerance){
-            return true;
-        }
-    }
+    //if (current_x < destination_x + k_end_tolerance
+    //        && current_x > destination_x - k_end_tolerance){
+    //    if (current_y < destination_y + k_end_tolerance
+    //            && current_y > destination_y - k_end_tolerance){
+    //        return true;
+    //    }
+    //}
+
+    int max_x = static_cast<int>(ceil((k_width_meters / 2) / k_granularity));
+    int max_y = static_cast<int>(ceil((k_height_meters / 2) / k_granularity));
 
     // Creates node structures for the beginning of the search
     struct coord start_coord = pos_to_coord(current_x, current_y);
     struct coord end_coord = pos_to_coord(destination_x, destination_y);
 
-    vector<node*> to_visit;
+    if (start_coord == end_coord) {
+        return true;
+    }
 
-    node* first_node = make_node(start_coord);
-    first_node->move_cost = 0;
-    first_node->heur_cost = sqrt(pow(start_coord.x - end_coord.x, 2)
+    set<node> to_visit;
+    //priority_queue<node*, std::greater<node*>> to_visit;
+    unordered_map<coord, coord> seen;   // <child, parent>
+
+    // The parent of the start node is itself
+    seen[start_coord] = start_coord;
+
+    node first_node = make_node(start_coord);
+    first_node.parent_node = start_coord;
+    first_node.move_cost = 0;
+    first_node.heur_cost = sqrt(pow(start_coord.x - end_coord.x, 2)
                                 + pow(start_coord.y - end_coord.y, 2));
-    to_visit.push_back(first_node);
-
-    struct node *running;
+    to_visit.insert(first_node);
+    struct node running;
 
     // Makes a safe copy of the running occupancy grid to perform A* on
-    mut.lock();
+    mx.lock();
     unordered_map<coord, cell_params> occupancy = occupancy_grid;
-    mut.unlock();
+    mx.unlock();
 
     // Runs until out of nodes that need to be checked
     while (to_visit.size() > 0) {
-        vector<node*>::iterator running_iterator = to_visit.begin();
-        running = *running_iterator;
+        //deque<node*>::iterator running_iterator = to_visit.begin();
 
-        // Checks all upcomming nodes to update 
-        for (vector<node*>::iterator iter = to_visit.begin(); iter != to_visit.end(); iter++) {
-            node* update_node = *iter;
-            if (update_node->heur_cost + update_node->move_cost
-                    <= running->move_cost + running->heur_cost) {
-                running_iterator = iter;
-                running = *running_iterator;
-            }
-        }
-
-        // Removes the running node from the tasks
-        to_visit.erase(running_iterator);
+        // Gets the lowest cost node in the visit set
+        auto running_it = to_visit.begin();
+        running = *running_it;
 
         // If we've reached the end_coord, we finna be done
-        if (running->c == end_coord) {
+        if (running.c == end_coord) {
             break;
         }
 
-        // Gets all possible neighboring nodes to filter through
-        vector<coord> to_check = neighbors(running->c);
-        for (coord& c: to_check) {
-            unordered_map<coord, cell_params>::iterator neib_it = occupancy.find(c);
+        // Removes the running node from the tasks
+        seen[running.c] = running.parent_node;
+        to_visit.erase(running_it);
+        //cout << running.c.x << ", " << running.c.y << ": " << to_visit.size() << endl;
 
+        // Gets all possible neighboring nodes to filter through
+        vector<coord> neibs = neighbors(running.c);
+        for (coord& c: neibs) {
+
+            // If it's a wall, bad, skip
+            unordered_map<coord, cell_params>::iterator neib_it = occupancy.find(c);
             // *If* it's something we've seen...
+            float cost_multiplier = 1.0;
             if (neib_it != occupancy.end()) {
                 // If we know for sure it's a wall, then don't consider this
                 struct cell_params checker = neib_it->second;
                 if (is_wall(checker)) {
-                    continue;
+                    cost_multiplier = 10000.0;
+                    //continue;
                 }
             }
 
-            // TODO - If this is slow, switch to a map to reduce runtime complexity
-            node* visit_cell = nullptr;
-            for (node* check : to_visit) {
-                if (check->c == c) {
-                    visit_cell = check;
-                    break;
-                }
+            // Ignore seen nodes
+            if (seen.find(c) != seen.end()) {
+                continue;
             }
+            if (c.x > max_x || c.x < -max_x || c.y > max_y || c.y < -max_y) {
+                continue;
+            }
+
+            // For every node in to_visit, if it is a neighbor of running, make that the cell the
+            // Next to visit (break after -> this will be fast because it's ordered).
+            struct node visit_cell = make_node(c);
+            std::set<node>::iterator it = to_visit.find(visit_cell);
+
 
             // Calculates the possible updated running cost for this new cell
-            float running_cost = running->move_cost;
-            running_cost += sqrt(pow(c.x - running->c.x, 2) + pow(c.x - running->c.x, 2));
+            float running_cost = running.move_cost;
+            running_cost += sqrt(pow(c.x - running.c.x, 2) + pow(c.y - running.c.y, 2));
 
+            // If the cell has not been visited yet by A*, add it to the queue
+            if (it == to_visit.end()) {
+                visit_cell = make_node(c);
+                visit_cell.parent_node = running.c;
+                visit_cell.move_cost = running_cost;
+                visit_cell.heur_cost = sqrt(pow(c.x - end_coord.x, 2)
+                                            + pow(c.y - end_coord.y, 2))
+                                            * cost_multiplier;
+                // Adds!
+                to_visit.insert(visit_cell);
+                seen[visit_cell.c] = visit_cell.parent_node;
+            }
             // Updates cells if the total cost ends up being better
-            if (visit_cell != nullptr) {
+            else {
+                visit_cell = *it;
                 // If this ends up being the running cheapest, update that bad boi
-                if (running_cost < visit_cell->move_cost) {
-                    visit_cell->parent_node = running;
-                    visit_cell->move_cost = running_cost;
+                if (running_cost < visit_cell.move_cost) {
+                    visit_cell.parent_node = running.c;
+                    visit_cell.move_cost = running_cost;
+                    // Updates!
+                    to_visit.erase(it);
+                    to_visit.insert(visit_cell);
+
+                    seen[visit_cell.c] = visit_cell.parent_node;
                 }
             }
-            // If the cell has not been visited yet by A*, add it to the queue
-            else if (visit_cell == nullptr) {
-                visit_cell = make_node(c);
-                visit_cell->parent_node = running;
-                visit_cell->move_cost = running_cost;
-                visit_cell->heur_cost = sqrt(pow(c.x - end_coord.x, 2)
-                                            + pow(c.y - end_coord.y, 2));
-                to_visit.push_back(visit_cell);
-            }
         }
-
-
-
-
-
     }
     
     // Runs backwards through the list to make a path of coordinates
     vector<coord> to_copy;
-    while (!(running->c == start_coord)) {
-        to_copy.push_back(running->c);
-        running = running->parent_node;
+    struct coord running_coord = running.c;
+    while (!(running_coord == start_coord)) {
+        to_copy.push_back(running_coord);
+        running_coord = seen[running_coord];
+        i++;
     }
 
     // Copies the A* result to the shared memory
-    mut.lock();
+    mx.lock();
     m_path = to_copy;
-    mut.unlock();
-
-    // I hope this is how iterators work when freeing memory...
-    vector<node*>::iterator visit_iter = to_visit.begin();
-    while (visit_iter != to_visit.end()) {
-        delete *visit_iter;
-        visit_iter = to_visit.erase(visit_iter);
-    }
+    mx.unlock();
 
     // You aint done yet dawg
     return false;
@@ -386,9 +420,9 @@ bool is_wall(cell_params cp) {
 
 
 // Makes a node struct
-node* make_node(coord c) {
-    node* ret = new node();
-    ret->c = c;
+node make_node(coord c) {
+    struct node ret; // = new node();
+    ret.c = c;
     return ret;
 }
 
@@ -427,18 +461,18 @@ int main(int argc, char* argv[]) {
     Robot robot(argc, argv, callback);
     cout << "ROBOT MADE" << endl;
     //thread rthr(robot_thread, &robot);
-    //thread astar(astar_thread);
+    thread astar(astar_thread);
 
     viz_run();
 
     //rthr.join();
-    //astar.join();
+    astar.join();
 
     return 0;
     //return viz_run();
 }
 
 
-// TODO: CHECK MUTEXES FOR OCCUPANCY GRID IN VIZ_HIT
+// TODO: CHECK mxEXES FOR OCCUPANCY GRID IN VIZ_HIT
 
 

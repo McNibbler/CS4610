@@ -3,6 +3,8 @@
 
 #include <utility>
 
+extern std::mutex mx;
+
 // New types added by Thomas, original header by Nat Tuck
 
 // Contents inside a cell
@@ -30,7 +32,17 @@ typedef struct node {
     struct coord c;
     float move_cost;
     float heur_cost;
-    node* parent_node;
+    //node* parent_node;
+    struct coord parent_node;
+    
+    // Overloaded comparator function
+    bool operator<(const node &other) const {
+        return (move_cost + heur_cost) < (other.move_cost + other.heur_cost);
+    }
+    // Overloaded comparator function
+    bool operator>(const node &other) const {
+        return (move_cost + heur_cost) > (other.move_cost + other.heur_cost);
+    }
 } node;
 
 
@@ -46,6 +58,21 @@ namespace std {
             size_t hash1 = hash<int>()(c.x);
             size_t hash2 = hash<int>()(c.y);
             return hash1 ^ (hash2 << 1);
+        }
+    };
+}
+
+// Hashing function for node*
+// Courtesy of Rubens on Stackoverflow
+namespace std {
+    template<>
+    struct hash<node> {
+        std::size_t operator()(const node& n) const {
+            using std::size_t;
+            using std::hash;
+
+            // Hashes using the coordinate because every node has a unique one
+            return hash<coord>()(n.c);
         }
     };
 }

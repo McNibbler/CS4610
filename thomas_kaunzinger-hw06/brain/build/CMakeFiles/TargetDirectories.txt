@@ -1,0 +1,3 @@
+/home/tkaunzinger/homework/CS4610/thomas_kaunzinger-hw06/brain/build/CMakeFiles/rebuild_cache.dir
+/home/tkaunzinger/homework/CS4610/thomas_kaunzinger-hw06/brain/build/CMakeFiles/edit_cache.dir
+/home/tkaunzinger/homework/CS4610/thomas_kaunzinger-hw06/brain/build/CMakeFiles/brain.dir

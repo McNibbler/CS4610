@@ -117,8 +117,8 @@ Robot::update()
     nudge(&(this->err_l));
     nudge(&(this->err_r));
 
-    this->pos_x = degrade(raw_x, err_x);
-    this->pos_y = degrade(raw_y, err_y);
+    this->pos_x = raw_x; //degrade(raw_x, err_x);
+    this->pos_y = raw_y; //degrade(raw_y, err_y);
     this->pos_t = raw_t; // no error on heading position, not worth it anymore
 
     this->on_update(this);
