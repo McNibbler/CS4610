@@ -2,7 +2,7 @@
 // Thomas Kaunzinger //
 //                   //
 // CS4610            //
-// Homework 6        //
+// Homework 7        //
 ///////////////////////
 
 // Imports
@@ -212,8 +212,8 @@ void callback(Robot* robot) {
 
         // Picks the node next on the path after the closest node to the robot
         //int target_index = (index_best < path_to_send.size() - 1) ? target_index + 1 : target_index;
-        //struct coord target_coord = path_to_send[target_index];
-        struct coord target_coord = closest;
+        struct coord target_coord = path_to_send[target_index];
+        //struct coord target_coord = closest;
 
         // Finds the target angle between the robot and the coord
         target_angle = r2d(atan(static_cast<float>(target_coord.y - robo_coord.y)
@@ -258,6 +258,7 @@ void callback(Robot* robot) {
     m_last_y= y_send;
 
     m_last_path = path_to_send;
+    usleep(250000);
 }
 
 
@@ -402,7 +403,8 @@ bool astar(float current_x, float current_y, float destination_x, float destinat
         // Removes the running node from the tasks
         seen[running.c] = running.parent_node;
         to_visit.erase(running_it);
-        //cout << running.c.x << ", " << running.c.y << ": " << to_visit.size() << endl;
+        cout << running.c.x << ", " << running.c.y << ": " << to_visit.size() << endl;
+        cout << running.move_cost + running.heur_cost << endl;
 
         // Gets all possible neighboring nodes to filter through
         vector<coord> neibs = neighbors(running.c);
@@ -425,6 +427,8 @@ bool astar(float current_x, float current_y, float destination_x, float destinat
             if (seen.find(c) != seen.end()) {
                 continue;
             }
+
+            // If OOB
             if (c.x > max_x || c.x < -max_x || c.y > max_y || c.y < -max_y) {
                 continue;
             }
@@ -436,28 +440,30 @@ bool astar(float current_x, float current_y, float destination_x, float destinat
 
 
             // Calculates the possible updated running cost for this new cell
-            float running_cost = running.move_cost;
-            running_cost += sqrt(pow(c.x - running.c.x, 2) + pow(c.y - running.c.y, 2));
+            float neib_cost = running.move_cost;
+            neib_cost += sqrt(pow(c.x - running.c.x, 2) + pow(c.y - running.c.y, 2));
 
             // If the cell has not been visited yet by A*, add it to the queue
             if (it == to_visit.end()) {
                 visit_cell = make_node(c);
                 visit_cell.parent_node = running.c;
-                visit_cell.move_cost = running_cost;
+                visit_cell.move_cost = neib_cost;
                 visit_cell.heur_cost = sqrt(pow(c.x - end_coord.x, 2)
                                             + pow(c.y - end_coord.y, 2))
                                             * cost_multiplier;
                 // Adds!
+                //if (neib_cost + coord_dist(c, end_coord) < running.move_cost + running.heur_cost) { // + visit_cell.heur_cost) {
                 to_visit.insert(visit_cell);
                 seen[visit_cell.c] = visit_cell.parent_node;
+                //}
             }
             // Updates cells if the total cost ends up being better
             else {
                 visit_cell = *it;
                 // If this ends up being the running cheapest, update that bad boi
-                if (running_cost < visit_cell.move_cost) {
+                if (neib_cost + coord_dist(c, end_coord) <  visit_cell.move_cost + visit_cell.heur_cost) {
                     visit_cell.parent_node = running.c;
-                    visit_cell.move_cost = running_cost;
+                    visit_cell.move_cost = neib_cost;
                     // Updates!
                     to_visit.erase(it);
                     to_visit.insert(visit_cell);
