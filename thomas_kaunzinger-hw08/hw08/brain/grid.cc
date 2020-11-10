@@ -120,13 +120,13 @@ neibs(coords aa)
 }
 
 void
-grid_apply_hit(LaserHit hit, Pose pose)
+grid_apply_cam_hit(float angle, float distance, Pose pose)
 {
     set<coords> cells;
 
-    for (float ds = 0.0f; ds < (hit.range - CELL_SIZE - 0.1); ds += 0.1f) {
-        float xx = pose.x + ds * cos(pose.t + hit.angle);
-        float yy = pose.y + ds * sin(pose.t + hit.angle);
+    for (float ds = 0.0f; ds < (distance - CELL_SIZE - 0.1); ds += 0.1f) {
+        float xx = pose.x + ds * cos(pose.t + angle);
+        float yy = pose.y + ds * sin(pose.t + angle);
         cells.insert(key(xx, yy));
     }
 
@@ -134,8 +134,8 @@ grid_apply_hit(LaserHit hit, Pose pose)
         grid_inc(cell, -2);
     }
 
-    float hx = pose.x + hit.range * cos(pose.t + hit.angle);
-    float hy = pose.y + hit.range * sin(pose.t + hit.angle);
+    float hx = pose.x + distance * cos(pose.t + angle);
+    float hy = pose.y + distance * sin(pose.t + angle);
     coords hk = key(hx, hy);
     grid_inc(hk, +8);
 

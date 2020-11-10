@@ -8,7 +8,7 @@
 static const float CELL_SIZE = 0.5;
 static const float VIEW_SIZE = 41;
 
-void grid_apply_hit(LaserHit hit, Pose pose);
+void grid_apply_cam_hit(float angle, float distance, Pose pose);
 Mat grid_view(Pose pose);
 void grid_find_path(float x0, float y0, float x1, float y1);
 float grid_goal_angle(Pose pose);
