@@ -24,7 +24,7 @@ using namespace std;
 
 // Constants
 #define fov             1.3962634
-#define pic_samps       10
+#define pic_samps       5
 #define pic_width       800
 #define pic_height      800
 #define scale_factor    8       // Int scalar to reduce resolution by
@@ -76,11 +76,11 @@ callback(Robot* robot)
         return;
     }
 
-    cam_show(robot->frame);
+
 
     cv::Mat pic = robot->frame;
 
-    cv::resize(robot->frame, pic, cv::Size(pic_width / scale_factor, pic_height / scale_factor));
+    //cv::resize(robot->frame, pic, cv::Size(pic_width / scale_factor, pic_height / scale_factor));
 
 
     // Calibrates roughly the pixels per meter of distance within the center of the screen
@@ -120,10 +120,10 @@ callback(Robot* robot)
         grid_apply_cam_hit(scangle, dist, pose);
     }
 
-
     grid_find_path(pose.x, pose.y, 20.0f, 0.0f);
     Mat view = grid_view(pose);
     viz_show(view);
+    //cam_show(robot->frame);
 
     float ang = grid_goal_angle(pose);
     float trn = clamp(-1.0f, 3 * ang, 1.0f);
@@ -139,7 +139,13 @@ callback(Robot* robot)
     }
 
     robot->set_vel(0.0, 0.0);
+    usleep(1000);
 }
+
+void robot_thread(Robot* robot) {
+    robot->do_stuff();
+}
+
 
 int
 main(int argc, char* argv[])
@@ -149,7 +155,8 @@ main(int argc, char* argv[])
 
     cout << "making robot" << endl;
     Robot robot(argc, argv, callback);
-    robot.do_stuff();
+    //robot.do_stuff();
+    std::thread rthr(robot_thread, &robot);
 
     return viz_run(argc, argv);
 }

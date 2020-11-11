@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 2.8 FATAL_ERROR)
+set(CMAKE_BUILD_TYPE Debug)
 
 # Find Gtk+3
 # ref: https://gist.github.com/fracek/3323924

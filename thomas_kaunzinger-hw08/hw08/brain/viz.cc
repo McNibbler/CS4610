@@ -313,6 +313,7 @@ viz_hit(float range, float angle)
 int
 viz_show_callback(void* view_ptr)
 {
+    cout << "Hello????" << endl;
     Mat view = *(Mat*)view_ptr;
     delete (Mat*)view_ptr;
 
@@ -331,6 +332,7 @@ viz_show_callback(void* view_ptr)
             draw_brush_color(drawing_area, xx, hh-yy, pix);
         }
     }
+
 
     return false;
 }
