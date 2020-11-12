@@ -13,7 +13,7 @@ using namespace std;
 void
 cam_init()
 {
-    namedWindow("camera", 1);
+    //namedWindow("camera", 1);
     cout << "named a window" << endl;
 }
 

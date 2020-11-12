@@ -14,7 +14,7 @@ using namespace std;
 #include "viz.hh"
 
 /* Surface to store current scribbles */
-std::mutex mx;
+//std::mutex mx;
 static cairo_surface_t* surface = NULL;
 static GtkWidget *window = NULL;
 static GtkWidget *drawing_area = NULL;
@@ -283,9 +283,9 @@ viz_hit_callback(void* hit_data_ptr)
     float dx = 0.5 * range * cos(angle);
     float dy = 0.5 * range * sin(angle);
 
-    cout << "rr,aa; dx,dy = "
-         << range << "," << angle << "; "
-         << dx << "," << dy << endl;
+    //cout << "rr,aa; dx,dy = "
+    //     << range << "," << angle << "; "
+    //     << dx << "," << dy << endl;
 
     int xx = dd + (dd*dx);
     int yy = hh - (dd + (dd*dy));
@@ -313,7 +313,7 @@ viz_hit(float range, float angle)
 int
 viz_show_callback(void* view_ptr)
 {
-    cout << "Hello????" << endl;
+    //cout << "Hello????" << endl;
     Mat view = *(Mat*)view_ptr;
     delete (Mat*)view_ptr;
 

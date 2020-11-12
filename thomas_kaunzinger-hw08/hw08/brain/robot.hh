@@ -8,6 +8,8 @@
 
 #include <opencv2/core/mat.hpp>
 
+double clamp(double, double, double);
+
 class Robot {
   public:
     void (*on_update)(Robot*);

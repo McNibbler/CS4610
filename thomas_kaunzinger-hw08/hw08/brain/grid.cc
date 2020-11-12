@@ -122,6 +122,8 @@ neibs(coords aa)
 void
 grid_apply_cam_hit(float angle, float distance, Pose pose)
 {
+
+
     set<coords> cells;
 
     for (float ds = 0.0f; ds < (distance - CELL_SIZE - 0.1); ds += 0.1f) {
@@ -138,6 +140,11 @@ grid_apply_cam_hit(float angle, float distance, Pose pose)
     float hy = pose.y + distance * sin(pose.t + angle);
     coords hk = key(hx, hy);
     grid_inc(hk, +8);
+
+
+    cout << "rob: " << pose.x << ", " << pose.y << ", " << (pose.t * 180.0 / M_PI) << endl;
+    cout << "hit: " << hx << ", " << hy << ", " << ((angle) * 180.0 / M_PI) << endl;
+    cout << endl;
 
     for (auto cell : neibs(hk)) {
         grid_inc(cell, +4);
@@ -340,8 +347,8 @@ grid_goal_angle(Pose pose)
 
     float ra = ang_diff(ga, pose.t);
 
-    cout << "ga = " << ga << "; "
-         << "ra = " << ra << endl;
+    //cout << "ga = " << ga << "; "
+    //     << "ra = " << ra << endl;
 
     return ra;
 }
