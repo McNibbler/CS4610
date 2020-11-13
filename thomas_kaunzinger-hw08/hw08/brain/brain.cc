@@ -25,16 +25,26 @@ using namespace std;
 
 // Constants
 #define fov             1.3962634
-#define pic_samps       5
+#define pic_samps       21
 #define pic_width       800
 #define pic_height      800
 #define scale_factor    8       // Int scalar to reduce resolution by
 #define mma_window      10
 
-// This is the color of the horribly grey sky
+// The colors of the environment
 #define sky_r           0xb2
 #define sky_g           0xb2
 #define sky_b           0xb2
+
+#define shadow_r        0x38
+#define shadow_g        0x38
+#define shadow_b        0x38
+
+#define floor_r         0x9b
+#define floor_g         0x9b
+#define floor_b         0x9b
+
+#define wall_height     1.5     // Wall is 3m x 3m, but half of it is underground, so it's 1.5m tall
 
 // Globals
 deque<float> pix_scalar_deque;
@@ -45,20 +55,35 @@ typedef lock_guard<mutex> guard;
 
 
 // Returns the number of pixels high a wall is in a desired column of an image
-int wall_dist_from_top(int column, cv::Mat pic) {
+int wall_pixels(int column, cv::Mat pic) {
     //cam_show(pic);
 
+    int wall_pix = 0;
     for (int row = 1; row < pic_height / scale_factor; row++) {
         //cout << column << ", " << row << endl;
         Vec3b color = pic.at<Vec3b>(cv::Point(column, row));
         
         //cout << +color.val[0] << ", " << +color.val[1] << ", " << +color.val[2] << endl;
 
-        // When you find a color that is no longer that fugly grey, you hit the wall
-        if (abs(color.val[0] - sky_r) > 5
-            && abs(color.val[1] - sky_g) > 5
-            && abs(color.val[2] - sky_b) > 5) {
-                return row;
+        // When you find a color that is no longer that fugly grey sky, you hit the wall
+        if (abs(color.val[0] - sky_r) > 3
+            && abs(color.val[1] - sky_g) > 3
+            && abs(color.val[2] - sky_b) > 3) {
+
+            // When you reach the shadow or the floor, you're done
+            if ((abs(color.val[0] - shadow_r) < 3
+                && abs(color.val[1] - shadow_g) < 3
+                && abs(color.val[2] - shadow_b) < 3)
+                ||
+                (abs(color.val[0] - floor_r) < 3
+                && abs(color.val[1] - floor_g) < 3
+                && abs(color.val[2] - floor_b) < 3)) {
+                    
+                return wall_pix;
+            }
+
+            // Incrememnt the wall size in pixels
+            wall_pix++;
         }
     }
 
@@ -66,9 +91,11 @@ int wall_dist_from_top(int column, cv::Mat pic) {
     return -1;
 }
 
-// Returns the visual angle given the wall's distance from the top of the screen in pixels
-float get_visual_angle(int pixels_from_top) {
-    return fov * static_cast<float>(100 - (2 * pixels_from_top)) / 100.0;
+// Returns the visual angle given the wall's size in pixels
+float get_visual_angle(int pixels) {
+    float proportion = static_cast<float>(pixels) / 100.0;
+    float visual_angle = proportion * fov;
+    return visual_angle;
 }
 
 
@@ -111,28 +138,28 @@ callback(Robot* robot)
     float dist = robot->range;
 
     // Calibrate based on distance to a wall.
-    if (dist < 2.5) {
+    //if (dist < 2.5) {
 
-        int column = (pic_width / scale_factor) / 2;         
-        int pixels = wall_dist_from_top(column, pic);
+    //    int column = (pic_width / scale_factor) / 2;         
+    //    int pixels = wall_pixels(column, pic);
 
-        // Tooooo close, man
-        if (pixels <= 1) {
-            robot->set_vel(-1.0, -1.0);
-            return;
-        }
+    //    // Tooooo close, man
+    //    if (pixels >= 98) {
+    //        robot->set_vel(-1.0, -1.0);
+    //        return;
+    //    }
 
-        // Updates the MMA vector for pix_scalar
-        float visual_angle = get_visual_angle(pixels);
-        float pix_scalar = (tan(visual_angle / 2.0)) * (2.0 * dist);
+    //    // Updates the MMA vector for pix_scalar
+    //    float visual_angle = get_visual_angle(pixels);
+    //    float pix_scalar = (tan(visual_angle / 2.0)) * (2.0 * dist);
 
-        cout << endl << pixels << ", " << visual_angle * 180.0 / M_PI << endl;
-        pix_scalar_deque.push_front(pix_scalar);
+    //    cout << endl << pixels << ", " << visual_angle * 180.0 / M_PI << endl;
+    //    pix_scalar_deque.push_front(pix_scalar);
 
-        if (pix_scalar_deque.size() > mma_window) {
-            pix_scalar_deque.pop_back();
-        }
-    }
+    //    if (pix_scalar_deque.size() > mma_window) {
+    //        pix_scalar_deque.pop_back();
+    //    }
+    //}
     //// If can't calibrate, just go towards a wall
     //else {
     //    robot->set_vel(1.0, 1.0);
@@ -147,18 +174,26 @@ callback(Robot* robot)
         
         float scangle = (static_cast<float>(column + 1) * (fov / static_cast<float>(pic_samps + 1)))
                             - (fov / 2);
-        int pixels = wall_dist_from_top(column * (pic_width / scale_factor), pic);
+
+        int pixels = wall_pixels(column * (pic_width / scale_factor), pic);
 
         // Can't take a meaningful distance when it's this close
-        if (pixels <= 1) {
+        // The wall takes up a little more than 2/3 of the screen when you are at a minimum too
+        // close to it
+        if (pixels >= 66) {
             continue;
         }
 
         // Compensates for the infinite focal length of the camera
         float visual_angle = get_visual_angle(pixels);
         //float dist = (static_cast<float>(pixels) / get_pix_scalar()) / cos(scangle);
-        float dist = get_pix_scalar() / (2 * tan(visual_angle / 2.0)) / cos(scangle);
+        //float dist = get_pix_scalar() / (2 * tan(visual_angle / 2.0)) / cos(scangle);
 
+        // Distance from visual angle...
+        // D = (size / 2) / (tan(visual_angle / 2))
+
+        float dist = (wall_height / 2) / tan(visual_angle / 2) / cos(scangle);
+        
         // Uses a similar function to the previous grid_apply_hit to update the occupancy grid
         // with the new location of this camera hit
         grid_apply_cam_hit(scangle, dist, pose);

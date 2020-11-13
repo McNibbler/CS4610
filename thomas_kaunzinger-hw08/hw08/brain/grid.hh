@@ -5,8 +5,8 @@
 #include "viz.hh"
 #include "pose.hh"
 
-static const float CELL_SIZE = 0.5;
-static const float VIEW_SIZE = 41;
+static const float CELL_SIZE = 0.25;
+static const float VIEW_SIZE = 80;
 
 void grid_apply_cam_hit(float angle, float distance, Pose pose);
 Mat grid_view(Pose pose);
